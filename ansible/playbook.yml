@@ -1,0 +1,40 @@
+- hosts: all
+  become: yes
+  remote_user: admin
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install Nginx
+      apt:
+        name: nginx
+        state: present
+
+    - name: Install htop
+      apt:
+        name: htop
+        state: present
+
+    - name: Start Nginx service
+      systemd:
+        name: nginx
+        state: started
+        enabled: yes
+
+    - name: Get instance IP address
+      ansible.builtin.shell: "curl -s http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/ip -H 'Metadata-Flavor: Google'"
+      register: instance_ip
+
+    - name: Create custom index.html with instance IP
+      template:
+        src: index.html.j2
+        dest: /var/www/html/index.html
+      vars:
+        ip_address: "{{ instance_ip.stdout }}"
+
+    - name: Ensure Nginx is running
+      systemd:
+        name: nginx
+        state: restarted

@@ -82,3 +82,19 @@ variable "iap_user_email" {
   description = "User email for IAP access"
   type        = string
 }
+
+variable "ssh_user" {
+  description = "SSH user for the instances"
+  type        = string
+  default     = "debian"
+}
+
+variable "ssh_pub_key_path" {
+  description = "Path to the public SSH key"
+  type        = string
+}
+
+variable "ssh_private_key_path" {
+  description = "Path to the private SSH key"
+  type        = string
+}

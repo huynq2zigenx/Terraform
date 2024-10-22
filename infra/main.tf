@@ -46,6 +46,40 @@ resource "google_compute_instance" "app_instance" {
       # Ephemeral IP
     }
   }
+
+  metadata = {
+    ssh-keys = "admin:${file(var.ssh_pub_key_path)}"
+  }
+
+  # Wait for SSH to be ready
+  provisioner "remote-exec" {
+    inline = ["echo 'Wait until SSH is ready'"]
+
+    connection {
+      type        = "ssh"
+      user        = "admin"
+      private_key = file(var.ssh_private_key_path)
+      host        = self.network_interface[0].access_config[0].nat_ip
+      timeout     = "2m"
+    }
+  }
+
+#   Upload file to remote
+#   provisioner "file" {
+#     source      = "../ansible/index.html.j2"
+#     destination = "/tmp/index.html.j2"
+#
+#     connection {
+#       type        = "ssh"
+#       user        = var.ssh_user
+#       private_key = file(var.ssh_private_key_path)
+#       host        = self.network_interface[0].access_config[0].nat_ip
+#     }
+#   }
+
+  provisioner "local-exec" {
+    command = "ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i '${self.network_interface[0].access_config[0].nat_ip},' --private-key ${var.ssh_private_key_path} -u ${var.ssh_user} ../ansible/playbook.yml"
+  }
 }
 
 # Load Balancer
@@ -70,6 +104,11 @@ resource "google_compute_instance_group" "app_instance_group" {
   name        = "app-instance-group"
   zone        = var.zone
   instances   = google_compute_instance.app_instance[*].self_link
+
+  named_port {
+    name = "http"  # This should match the port_name in backend service
+    port = 80
+  }
 }
 
 resource "google_compute_url_map" "default" {
@@ -105,12 +144,15 @@ resource "google_sql_database_instance" "my_sql_instance" {
       }
     }
   }
+
+  deletion_protection = false
 }
 
 # Cloud Storage Bucket
 resource "google_storage_bucket" "my_bucket" {
   name     = "${var.project_id}-bucket"
   location = var.region
+  force_destroy = false
 }
 
 # Health Check
